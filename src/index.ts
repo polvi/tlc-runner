@@ -58,10 +58,15 @@ app.post('/', async (c) => {
         stream.write(data.toString())
       })
 
+      // Handle client disconnect
+      stream.onAbort(() => {
+        child.kill()
+      })
+
       // Wait for the process to complete
       await new Promise((resolve) => {
         child.on('close', (code) => {
-          if (code !== 0) {
+          if (code !== 0 && code !== null) {
             stream.write(`\nProcess exited with code ${code}\n`)
           }
           resolve(null)

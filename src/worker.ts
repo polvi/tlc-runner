@@ -13,8 +13,8 @@ export class Backend extends Container {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const id = env.BACKEND.idFromName("default")
-    const stub = env.BACKEND.get(id)
-    return stub.fetch(request)
+    // Use getRandom to correctly route to a Container instance
+    const containerInstance = await getRandom(env.BACKEND, INSTANCE_COUNT);
+    return containerInstance.fetch(request);
   },
 };
