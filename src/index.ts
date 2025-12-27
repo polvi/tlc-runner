@@ -35,9 +35,12 @@ app.post('/', async (c) => {
     return streamText(c, async (stream) => {
       // Execute TLC checker using spawn for streaming
       const child = spawn('java', [
+        '-XX:+UseParallelGC',
         '-cp', 
         '/usr/local/lib/tla2tools.jar', 
         'tlc2.TLC', 
+        '-terse',
+        '-nowarning',
         '-config', 
         cfgFile.name, 
         tlaFile.name
