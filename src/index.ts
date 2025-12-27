@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { spawnSync } from 'node:child_process'
+import { streamText } from 'hono/streaming'
+import { spawn } from 'node:child_process'
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -31,32 +32,58 @@ app.post('/', async (c) => {
     writeFileSync(tlaPath, Buffer.from(await tlaFile.arrayBuffer()))
     writeFileSync(cfgPath, Buffer.from(await cfgFile.arrayBuffer()))
 
-    // Execute TLC checker
-    // Assumes tla2tools.jar is in the classpath or handled by the container environment
-    const result = spawnSync('java', [
-      '-cp', 
-      '/usr/local/lib/tla2tools.jar', 
-      'tlc2.TLC', 
-      '-config', 
-      cfgFile.name, 
-      tlaFile.name
-    ], {
-      cwd: tmpDir,
-      encoding: 'utf-8'
+    return streamText(c, async (stream) => {
+      // Execute TLC checker using spawn for streaming
+      const child = spawn('java', [
+        '-cp', 
+        '/usr/local/lib/tla2tools.jar', 
+        'tlc2.TLC', 
+        '-config', 
+        cfgFile.name, 
+        tlaFile.name
+      ], {
+        cwd: tmpDir
+      })
+
+      // Stream stdout to the client
+      child.stdout.on('data', (data) => {
+        stream.write(data.toString())
+      })
+
+      // Stream stderr to the client
+      child.stderr.on('data', (data) => {
+        stream.write(data.toString())
+      })
+
+      // Wait for the process to complete
+      await new Promise((resolve) => {
+        child.on('close', (code) => {
+          if (code !== 0) {
+            stream.write(`\nProcess exited with code ${code}\n`)
+          }
+          resolve(null)
+        })
+
+        child.on('error', (err) => {
+          stream.write(`\nError spawning TLC: ${err.message}\n`)
+          resolve(null)
+        })
+      })
+
+      // Cleanup temporary files after stream is finished
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch (e) {
+        console.error('Failed to cleanup temp directory', e)
+      }
     })
 
-    const output = result.stdout + result.stderr
-    return c.text(output)
-
   } catch (error: any) {
-    return c.text(`Error running TLC: ${error.message}`, 500)
-  } finally {
-    // Cleanup temporary files
+    // If we fail before the stream starts, cleanup and return error
     try {
       rmSync(tmpDir, { recursive: true, force: true })
-    } catch (e) {
-      console.error('Failed to cleanup temp directory', e)
-    }
+    } catch (e) {}
+    return c.text(`Error initializing TLC: ${error.message}`, 500)
   }
 })
 
