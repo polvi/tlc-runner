@@ -1,0 +1,16 @@
+name = "container-starter"
+main = "src/worker.ts"
+compatibility_date = "2025-12-27"
+
+[[containers]]
+image = "./Dockerfile"
+class_name = "Backend"
+max_instances = 3
+
+[[durable_objects.bindings]]
+class_name = "Backend"
+name = "BACKEND"
+
+[[migrations]]
+new_sqlite_classes = [ "Backend" ]
+tag = "v1"

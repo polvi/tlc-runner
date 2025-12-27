@@ -11,6 +11,7 @@
     "hono": "^4.11.3"
   },
   "devDependencies": {
+    "@cloudflare/containers": "^0.0.31",
     "wrangler": "^4.4.0"
   }
 }
