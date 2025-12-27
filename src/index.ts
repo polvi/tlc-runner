@@ -34,8 +34,10 @@ app.post('/', async (c) => {
 
     return streamText(c, async (stream) => {
       // Execute TLC checker using spawn for streaming
+      // Tuned for 6144MB container: Using 5GB heap and G1GC
       const child = spawn('java', [
-        '-XX:+UseParallelGC',
+        '-Xmx5G',
+        '-XX:+UseG1GC',
         '-cp', 
         '/usr/local/lib/tla2tools.jar', 
         'tlc2.TLC', 
