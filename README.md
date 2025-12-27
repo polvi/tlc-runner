@@ -1,7 +1,6 @@
-This project is a container that provides an API gateway for running TLA+ TLC checker. It takes a multipart form upload of a .tla file and associated .cfg and returns the output from the TLC command. It is build in Hono and shells out to java to run the TLC checker. The post returns the output of the TLC command. 
+This project is a containerized API gateway for running the TLA+ TLC checker. It accepts multipart form uploads of `.tla` files and associated `.cfg` files, returning the output from the TLC command. The application is built with Hono and executes the TLC checker via a Java subprocess.
 
-The runner itself is a Hono application at src/index.ts that spawns to the tlc java runtime to do the TLC checking. The container is executed as part of cloudflare's container platform, in which the worker code for that is at `src/worker.ts`. See `wrangler.toml` for configuration. 
-
+The runner is a Hono application located at `src/index.ts` that spawns the TLC Java runtime to perform the model checking. The container is deployed as part of Cloudflare's container platform; the orchestration logic for the worker is located at `src/worker.ts`. See `wrangler.toml` for configuration details.
 
 ```txt
 bun install
