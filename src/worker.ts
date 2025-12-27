@@ -13,12 +13,8 @@ export class Backend extends Container {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // Get a random container instance from the pool
-    const containerInstance = await getRandom(env.BACKEND, INSTANCE_COUNT);
-    
-    // Forward the request to the container. 
-    // Cloudflare Workers will automatically stream the response body 
-    // from the backend container to the client.
-    return containerInstance.fetch(request);
+    const id = env.BACKEND.idFromName("default")
+    const stub = env.BACKEND.get(id)
+    return stub.fetch(request)
   },
 };
