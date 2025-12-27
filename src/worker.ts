@@ -8,7 +8,7 @@ export interface Env {
 
 export class Backend extends Container {
   defaultPort = 3000;
-  sleepAfter = "2m";
+  sleepAfter = "15m";
 }
 
 export default {
