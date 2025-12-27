@@ -3,7 +3,7 @@ FROM oven/bun:latest
 
 # Install Java (OpenJDK) and curl
 RUN apt-get update && apt-get install -y \
-    openjdk-17-jre-headless \
+    openjdk-21-jdk-headless \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
