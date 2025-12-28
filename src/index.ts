@@ -12,6 +12,7 @@ app.get('/', (c) => {
 })
 
 app.post('/', async (c) => {
+  // Increase the timeout for parsing the body if files are large
   const body = await c.req.parseBody()
   
   const tlaFile = body['tla']
@@ -33,6 +34,12 @@ app.post('/', async (c) => {
     writeFileSync(cfgPath, Buffer.from(await cfgFile.arrayBuffer()))
 
     return streamText(c, async (stream) => {
+      // Heartbeat to keep the connection alive during long-running model checks
+      // Using a newline instead of a space can be more robust for some clients
+      const heartbeat = setInterval(() => {
+        stream.write('\n') 
+      }, 10000)
+
       // Execute TLC checker using spawn for streaming
       // Tuned for 6144MB container: Using 5GB heap and G1GC
       const child = spawn('java', [
@@ -62,12 +69,14 @@ app.post('/', async (c) => {
 
       // Handle client disconnect
       stream.onAbort(() => {
+        clearInterval(heartbeat)
         child.kill()
       })
 
       // Wait for the process to complete
       await new Promise((resolve) => {
         child.on('close', (code) => {
+          clearInterval(heartbeat)
           if (code !== 0 && code !== null) {
             stream.write(`\nProcess exited with code ${code}\n`)
           }
@@ -75,6 +84,7 @@ app.post('/', async (c) => {
         })
 
         child.on('error', (err) => {
+          clearInterval(heartbeat)
           stream.write(`\nError spawning TLC: ${err.message}\n`)
           resolve(null)
         })
