@@ -1,11 +1,10 @@
 import { Hono } from 'hono'
-import { exec } from 'node:child_process'
+import { streamText } from 'hono/streaming'
+import { spawn } from 'node:child_process'
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { promisify } from 'node:util'
 
-const execPromise = promisify(exec)
 const app = new Hono()
 
 app.get('/', (c) => {
@@ -31,43 +30,52 @@ app.post('/', async (c) => {
     writeFileSync(tlaPath, Buffer.from(await tlaFile.arrayBuffer()))
     writeFileSync(cfgPath, Buffer.from(await cfgFile.arrayBuffer()))
 
-    // Execute TLC checker synchronously (non-streaming)
-    // Using 5GB heap and G1GC for the 6144MB container
-    const command = [
-      'java',
-      '-Xmx5G',
-      '-XX:+UseG1GC',
-      '-cp', 
-      '/usr/local/lib/tla2tools.jar', 
-      'tlc2.TLC', 
-      '-terse',
-      '-nowarning',
-      '-config', 
-      cfgFile.name, 
-      tlaFile.name
-    ].join(' ')
-
-    try {
-      const { stdout, stderr } = await execPromise(command, {
-        cwd: tmpDir,
-        maxBuffer: 10 * 1024 * 1024 // 10MB buffer for output
+    return streamText(c, async (stream) => {
+      // Execute TLC checker
+      // Using 5GB heap and G1GC for the 6144MB container
+      const child = spawn('java', [
+        '-Xmx5G',
+        '-XX:+UseG1GC',
+        '-cp', 
+        '/usr/local/lib/tla2tools.jar', 
+        'tlc2.TLC', 
+        '-terse',
+        '-nowarning',
+        '-config', 
+        cfgFile.name, 
+        tlaFile.name
+      ], {
+        cwd: tmpDir
       })
+
+      child.stdout.on('data', (data) => {
+        stream.write(data.toString())
+      })
+
+      child.stderr.on('data', (data) => {
+        stream.write(data.toString())
+      })
+
+      const exitCode = await new Promise((resolve) => {
+        child.on('close', resolve)
+      })
+
+      await stream.writeln(`\nProcess exited with code ${exitCode}`)
       
-      return c.text(stdout + stderr)
-    } catch (execError: any) {
-      // TLC often exits with non-zero codes if errors are found in the model
-      // We still want to return the output in those cases
-      return c.text((execError.stdout || '') + (execError.stderr || '') + `\nProcess exited with error: ${execError.message}`)
-    }
+      // Cleanup temp directory after streaming is done
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch (e) {
+        console.error('Failed to cleanup temp directory', e)
+      }
+    })
 
   } catch (error: any) {
-    return c.text(`Error running TLC: ${error.message}`, 500)
-  } finally {
+    // Cleanup if setup fails before streaming starts
     try {
       rmSync(tmpDir, { recursive: true, force: true })
-    } catch (e) {
-      console.error('Failed to cleanup temp directory', e)
-    }
+    } catch (e) {}
+    return c.text(`Error starting TLC: ${error.message}`, 500)
   }
 })
 
