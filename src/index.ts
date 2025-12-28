@@ -34,13 +34,13 @@ app.post('/', async (c) => {
       // Execute TLC checker
       // Using 5GB heap and G1GC for the 6144MB container
       const child = spawn('java', [
-        '-Xmx5G',
-        '-XX:+UseG1GC',
         '-cp', 
         '/usr/local/lib/tla2tools.jar', 
         'tlc2.TLC', 
         '-terse',
         '-nowarning',
+        '-workers',
+        'auto',
         '-config', 
         cfgFile.name, 
         tlaFile.name
